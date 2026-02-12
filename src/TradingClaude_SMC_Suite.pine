@@ -466,14 +466,15 @@ f_liq_detectSweeps() =>
     sweepPrice
 
 f_liq_extendLines() =>
-    for index = 0 to liquidityLevels.size() - 1
-        if index >= liquidityLevels.size()
-            break
-        liquidityLevel lvl = liquidityLevels.get(index)
-        if not lvl.swept and not na(lvl.l_ine)
-            lvl.l_ine.set_second_point(chart.point.new(last_bar_time, na, lvl.price))
-        if not lvl.swept and not na(lvl.l_abel)
-            lvl.l_abel.set_point(chart.point.new(last_bar_time, na, lvl.price))
+    if liquidityLevels.size() > 0
+        for index = 0 to liquidityLevels.size() - 1
+            if index >= liquidityLevels.size()
+                break
+            liquidityLevel lvl = liquidityLevels.get(index)
+            if not lvl.swept and not na(lvl.l_ine)
+                lvl.l_ine.set_second_point(chart.point.new(last_bar_time, na, lvl.price))
+            if not lvl.swept and not na(lvl.l_abel)
+                lvl.l_abel.set_point(chart.point.new(last_bar_time, na, lvl.price))
 
 //=============================================================================
 //--- MODULE: ORDER BLOCKS (defined before market structure) ---//
@@ -554,10 +555,11 @@ f_ob_draw(bool internal) =>
                 b_ox.set_bgcolor(mitigatedColor)
                 b_ox.set_border_style(line.style_dotted)
                 b_ox.set_extend(extend.none)
-        for index = limit to b_oxes.size() - 1
-            box b_ox = b_oxes.get(index)
-            b_ox.set_top_left_point(chart.point.new(na, na, na))
-            b_ox.set_bottom_right_point(chart.point.new(na, na, na))
+        if limit < b_oxes.size()
+            for index = limit to b_oxes.size() - 1
+                box b_ox = b_oxes.get(index)
+                b_ox.set_top_left_point(chart.point.new(na, na, na))
+                b_ox.set_bottom_right_point(chart.point.new(na, na, na))
 
 //=============================================================================
 //--- MODULE: MARKET STRUCTURE ---//
@@ -1111,7 +1113,7 @@ f_confluence_detect() =>
         else if htfTrendBias == BEARISH and isBear
             cCount += 1
             cText  += 'HTF '
-    if showMTFAnalysisInput
+    if showMTFAnalysisInput and htfOBTops.size() > 0
         for i = 0 to htfOBTops.size() - 1
             if i >= htfOBTops.size()
                 break
@@ -1193,17 +1195,18 @@ f_dash_update() =>
         if showLiquidityRowInput
             nearestBSL = float(na)
             nearestSSL = float(na)
-            for i = 0 to liquidityLevels.size() - 1
-                if i >= liquidityLevels.size()
-                    break
-                liquidityLevel lvl = liquidityLevels.get(i)
-                if not lvl.swept
-                    if lvl.bias == BEARISH and lvl.price > close
-                        if na(nearestBSL) or lvl.price < nearestBSL
-                            nearestBSL := lvl.price
-                    if lvl.bias == BULLISH and lvl.price < close
-                        if na(nearestSSL) or lvl.price > nearestSSL
-                            nearestSSL := lvl.price
+            if liquidityLevels.size() > 0
+                for i = 0 to liquidityLevels.size() - 1
+                    if i >= liquidityLevels.size()
+                        break
+                    liquidityLevel lvl = liquidityLevels.get(i)
+                    if not lvl.swept
+                        if lvl.bias == BEARISH and lvl.price > close
+                            if na(nearestBSL) or lvl.price < nearestBSL
+                                nearestBSL := lvl.price
+                        if lvl.bias == BULLISH and lvl.price < close
+                            if na(nearestSSL) or lvl.price > nearestSSL
+                                nearestSSL := lvl.price
             bslText = not na(nearestBSL) ? str.tostring(nearestBSL, format.mintick) : '--'
             sslText = not na(nearestSSL) ? str.tostring(nearestSSL, format.mintick) : '--'
             table.cell(dashboard, 0, rowIdx, 'Liquidity', text_color = COLOR_DASH_TEXT, text_size = dSize, text_halign = text.align_left)
