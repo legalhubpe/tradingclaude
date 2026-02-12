@@ -393,8 +393,8 @@ htfHTFLabel = switch htfTimeframe
     => htfTimeframe
 
 // HTF structure data - all at global scope for anti-repainting
-htfSwH    = request.security(syminfo.tickerid, htfTimeframe, ta.pivothigh(5)[1], barmerge.gaps_off, barmerge.lookahead_on)
-htfSwL    = request.security(syminfo.tickerid, htfTimeframe, ta.pivotlow(5)[1],  barmerge.gaps_off, barmerge.lookahead_on)
+htfSwH    = request.security(syminfo.tickerid, htfTimeframe, ta.pivothigh(5, 5)[1], barmerge.gaps_off, barmerge.lookahead_on)
+htfSwL    = request.security(syminfo.tickerid, htfTimeframe, ta.pivotlow(5, 5)[1],  barmerge.gaps_off, barmerge.lookahead_on)
 htfClose  = request.security(syminfo.tickerid, htfTimeframe, close[1], barmerge.gaps_off, barmerge.lookahead_on)
 htfHigh_v = request.security(syminfo.tickerid, htfTimeframe, high[1],  barmerge.gaps_off, barmerge.lookahead_on)
 htfLow_v  = request.security(syminfo.tickerid, htfTimeframe, low[1],   barmerge.gaps_off, barmerge.lookahead_on)
@@ -439,6 +439,7 @@ f_liq_drawEqualHighLow(pivot p_ivot, float level, int size, bool equalHigh) =>
                 label.delete(old.l_abel)
 
 f_liq_detectSweeps() =>
+    float sweepPrice = na
     if liquidityLevels.size() > 0
         for index = liquidityLevels.size() - 1 to 0
             if index >= liquidityLevels.size()
@@ -450,7 +451,7 @@ f_liq_detectSweeps() =>
                 lvl.swept       := true
                 lvl.sweepBarIdx := bar_index
                 currentAlerts.bearishSweep := true
-                lastSweepLevel := lvl.price
+                sweepPrice := lvl.price
                 if not na(lvl.l_ine)
                     lvl.l_ine.set_second_point(chart.point.new(time, na, lvl.price))
                 label.new(chart.point.new(time, na, high), 'SWEEP', xloc = xloc.bar_time, color = color(na), textcolor = COLOR_LIQ_RED, style = label.style_label_down, size = TINY)
@@ -458,10 +459,11 @@ f_liq_detectSweeps() =>
                 lvl.swept       := true
                 lvl.sweepBarIdx := bar_index
                 currentAlerts.bullishSweep := true
-                lastSweepLevel := lvl.price
+                sweepPrice := lvl.price
                 if not na(lvl.l_ine)
                     lvl.l_ine.set_second_point(chart.point.new(time, na, lvl.price))
                 label.new(chart.point.new(time, na, low), 'SWEEP', xloc = xloc.bar_time, color = color(na), textcolor = COLOR_LIQ_CYAN, style = label.style_label_up, size = TINY)
+    sweepPrice
 
 f_liq_extendLines() =>
     for index = 0 to liquidityLevels.size() - 1
@@ -516,7 +518,7 @@ f_ob_checkMitigation(bool internal) =>
                 currentAlerts.swingBullishOrderBlock    := true
         if crossedOB
             if hideMitigatedOBsInput
-                orderBlocks.remove(index)
+                _removed = orderBlocks.remove(index)
             else
                 eachOB.state := 1
 
@@ -629,6 +631,10 @@ f_ms_getCurrentStructure(int size, bool equalHighLow, bool internal) =>
 f_ms_displayStructure(bool internal) =>
     var bullishBar = true
     var bearishBar = true
+    float _bosPrice = na
+    int _bosBias = 0
+    float _chochPrice = na
+    int _chochBias = 0
     if internalFilterConfluenceInput
         bullishBar := high - math.max(close, open) > (math.min(close, open) - low)
         bearishBar := high - math.max(close, open) < (math.min(close, open) - low)
@@ -649,11 +655,11 @@ f_ms_displayStructure(bool internal) =>
         p_ivot.crossed := true
         t_rend.bias    := BULLISH
         if tag == BOS
-            lastBOSPrice := p_ivot.currentLevel
-            lastBOSBias  := BULLISH
+            _bosPrice := p_ivot.currentLevel
+            _bosBias  := BULLISH
         else
-            lastCHoCHPrice := p_ivot.currentLevel
-            lastCHoCHBias  := BULLISH
+            _chochPrice := p_ivot.currentLevel
+            _chochBias  := BULLISH
         displayCondition = internal ? showInternalsInput and (showInternalBullInput == ALL or (showInternalBullInput == BOS and tag != CHOCH) or (showInternalBullInput == CHOCH and tag == CHOCH)) : showStructureInput and (showSwingBullInput == ALL or (showSwingBullInput == BOS and tag != CHOCH) or (showSwingBullInput == CHOCH and tag == CHOCH))
         if displayCondition
             f_ms_drawStructure(p_ivot, tag, bullishColor, lineStyle, label.style_label_down, labelSize)
@@ -674,16 +680,17 @@ f_ms_displayStructure(bool internal) =>
         p_ivot.crossed := true
         t_rend.bias    := BEARISH
         if tag == BOS
-            lastBOSPrice := p_ivot.currentLevel
-            lastBOSBias  := BEARISH
+            _bosPrice := p_ivot.currentLevel
+            _bosBias  := BEARISH
         else
-            lastCHoCHPrice := p_ivot.currentLevel
-            lastCHoCHBias  := BEARISH
+            _chochPrice := p_ivot.currentLevel
+            _chochBias  := BEARISH
         displayCondition = internal ? showInternalsInput and (showInternalBearInput == ALL or (showInternalBearInput == BOS and tag != CHOCH) or (showInternalBearInput == CHOCH and tag == CHOCH)) : showStructureInput and (showSwingBearInput == ALL or (showSwingBearInput == BOS and tag != CHOCH) or (showSwingBearInput == CHOCH and tag == CHOCH))
         if displayCondition
             f_ms_drawStructure(p_ivot, tag, bearishColor, lineStyle, label.style_label_up, labelSize)
         if (internal and showInternalOrderBlocksInput) or (not internal and showSwingOrderBlocksInput)
             f_ob_store(p_ivot, internal, BEARISH)
+    [_bosPrice, _bosBias, _chochPrice, _chochBias]
 
 //=============================================================================
 //--- MODULE: FAIR VALUE GAPS ---//
@@ -810,14 +817,18 @@ f_pd_drawPremiumDiscountZones() =>
         f_pd_updateFibLevel(fibLine618, fibLabel618, trailing.bottom + rangeVal * 0.618)
         f_pd_updateFibLevel(fibLine382, fibLabel382, trailing.bottom + rangeVal * 0.382)
         f_pd_updateFibLevel(fibLine236, fibLabel236, trailing.bottom + rangeVal * 0.236)
+    float _pdPct = pdPositionPct
+    bool _inPrem = priceInPremium
+    bool _inDisc = priceInDiscount
     if rangeVal > 0
-        pdPositionPct  := (close - trailing.bottom) / rangeVal * 100
-        priceInPremium := pdPositionPct > 50
-        priceInDiscount := pdPositionPct <= 50
-        if priceInPremium and not priceInPremium[1]
+        _pdPct  := (close - trailing.bottom) / rangeVal * 100
+        _inPrem := _pdPct > 50
+        _inDisc := _pdPct <= 50
+        if _inPrem and not priceInPremium[1]
             currentAlerts.premiumEntry := true
-        if priceInDiscount and not priceInDiscount[1]
+        if _inDisc and not priceInDiscount[1]
             currentAlerts.discountEntry := true
+    [_pdPct, _inPrem, _inDisc]
 
 //=============================================================================
 //--- MODULE: MULTI-TIMEFRAME LEVELS ---//
@@ -920,34 +931,51 @@ f_mtf_drawMonthlyLevels() =>
 //=============================================================================
 
 f_mtf_processHTFStructure() =>
+    // Local copies of all global state
+    float _htfLastPivotH    = htfLastPivotH
+    float _htfPivotHigh     = htfPivotHigh
+    bool  _htfHighCrossed   = htfHighCrossed
+    int   _htfPivotHighTime = htfPivotHighTime
+    float _prevHTFSwH       = prevHTFSwH
+    float _htfLastPivotL    = htfLastPivotL
+    float _htfPivotLow      = htfPivotLow
+    bool  _htfLowCrossed    = htfLowCrossed
+    int   _htfPivotLowTime  = htfPivotLowTime
+    float _prevHTFSwL       = prevHTFSwL
+    int   _htfTrendBiasVal  = htfTrendBiasVal
+    float _htfLastBOS       = htfLastBOS
+    float _htfLastCHoCH     = htfLastCHoCH
+    float _prevHTFClose     = prevHTFClose
+    int   _htfTrendBias     = htfTrendBias
+
     // Detect new HTF swing high
-    if not na(htfSwH) and htfSwH != prevHTFSwH
-        htfLastPivotH    := htfPivotHigh
-        htfPivotHigh     := htfSwH
-        htfHighCrossed   := false
-        htfPivotHighTime := htfTime_v
-        prevHTFSwH       := htfSwH
+    if not na(htfSwH) and htfSwH != _prevHTFSwH
+        _htfLastPivotH    := _htfPivotHigh
+        _htfPivotHigh     := htfSwH
+        _htfHighCrossed   := false
+        _htfPivotHighTime := htfTime_v
+        _prevHTFSwH       := htfSwH
 
     // Detect new HTF swing low
-    if not na(htfSwL) and htfSwL != prevHTFSwL
-        htfLastPivotL   := htfPivotLow
-        htfPivotLow     := htfSwL
-        htfLowCrossed   := false
-        htfPivotLowTime := htfTime_v
-        prevHTFSwL      := htfSwL
+    if not na(htfSwL) and htfSwL != _prevHTFSwL
+        _htfLastPivotL   := _htfPivotLow
+        _htfPivotLow     := htfSwL
+        _htfLowCrossed   := false
+        _htfPivotLowTime := htfTime_v
+        _prevHTFSwL      := htfSwL
 
     // HTF Bullish BOS/CHoCH
-    if not na(htfPivotHigh) and not htfHighCrossed and not na(htfClose) and htfClose > htfPivotHigh
-        htfHighCrossed := true
-        string htfTag = htfTrendBiasVal == BEARISH ? 'CHoCH' : 'BOS'
-        htfTrendBiasVal := BULLISH
+    if not na(_htfPivotHigh) and not _htfHighCrossed and not na(htfClose) and htfClose > _htfPivotHigh
+        _htfHighCrossed := true
+        string htfTag = _htfTrendBiasVal == BEARISH ? 'CHoCH' : 'BOS'
+        _htfTrendBiasVal := BULLISH
         if htfTag == 'BOS'
-            htfLastBOS := htfPivotHigh
+            _htfLastBOS := _htfPivotHigh
         else
-            htfLastCHoCH := htfPivotHigh
+            _htfLastCHoCH := _htfPivotHigh
         if showHTFStructureInput
-            line.new(chart.point.new(htfPivotHighTime, na, htfPivotHigh), chart.point.new(time, na, htfPivotHigh), xloc = xloc.bar_time, color = COLOR_BULLISH, style = line.style_solid, width = 2)
-            label.new(chart.point.new(time, na, htfPivotHigh), '[' + htfHTFLabel + '] ' + htfTag, xloc = xloc.bar_time, color = color(na), textcolor = COLOR_BULLISH, style = label.style_label_down, size = SMALL)
+            line.new(chart.point.new(_htfPivotHighTime, na, _htfPivotHigh), chart.point.new(time, na, _htfPivotHigh), xloc = xloc.bar_time, color = COLOR_BULLISH, style = line.style_solid, width = 2)
+            label.new(chart.point.new(time, na, _htfPivotHigh), '[' + htfHTFLabel + '] ' + htfTag, xloc = xloc.bar_time, color = color(na), textcolor = COLOR_BULLISH, style = label.style_label_down, size = SMALL)
         if showHTFOrderBlocksInput and not na(htfLow_v)
             if htfOBBoxes.size() >= maxHTFZonesInput
                 box oldBox = htfOBBoxes.pop()
@@ -962,17 +990,17 @@ f_mtf_processHTFStructure() =>
             htfOBBiases.unshift(BULLISH)
 
     // HTF Bearish BOS/CHoCH
-    if not na(htfPivotLow) and not htfLowCrossed and not na(htfClose) and htfClose < htfPivotLow
-        htfLowCrossed := true
-        string htfTag = htfTrendBiasVal == BULLISH ? 'CHoCH' : 'BOS'
-        htfTrendBiasVal := BEARISH
+    if not na(_htfPivotLow) and not _htfLowCrossed and not na(htfClose) and htfClose < _htfPivotLow
+        _htfLowCrossed := true
+        string htfTag = _htfTrendBiasVal == BULLISH ? 'CHoCH' : 'BOS'
+        _htfTrendBiasVal := BEARISH
         if htfTag == 'BOS'
-            htfLastBOS := htfPivotLow
+            _htfLastBOS := _htfPivotLow
         else
-            htfLastCHoCH := htfPivotLow
+            _htfLastCHoCH := _htfPivotLow
         if showHTFStructureInput
-            line.new(chart.point.new(htfPivotLowTime, na, htfPivotLow), chart.point.new(time, na, htfPivotLow), xloc = xloc.bar_time, color = COLOR_BEARISH, style = line.style_solid, width = 2)
-            label.new(chart.point.new(time, na, htfPivotLow), '[' + htfHTFLabel + '] ' + htfTag, xloc = xloc.bar_time, color = color(na), textcolor = COLOR_BEARISH, style = label.style_label_up, size = SMALL)
+            line.new(chart.point.new(_htfPivotLowTime, na, _htfPivotLow), chart.point.new(time, na, _htfPivotLow), xloc = xloc.bar_time, color = COLOR_BEARISH, style = line.style_solid, width = 2)
+            label.new(chart.point.new(time, na, _htfPivotLow), '[' + htfHTFLabel + '] ' + htfTag, xloc = xloc.bar_time, color = color(na), textcolor = COLOR_BEARISH, style = label.style_label_up, size = SMALL)
         if showHTFOrderBlocksInput and not na(htfHigh_v)
             if htfOBBoxes.size() >= maxHTFZonesInput
                 box oldBox = htfOBBoxes.pop()
@@ -988,7 +1016,7 @@ f_mtf_processHTFStructure() =>
 
     // HTF FVG detection
     if showHTFFVGsInput and not na(htfLow_v) and not na(htfHigh3_v)
-        if htfLow_v > htfHigh3_v and prevHTFClose != htfClose
+        if htfLow_v > htfHigh3_v and _prevHTFClose != htfClose
             if htfFVGBoxes.size() >= maxHTFZonesInput
                 box oldFVG = htfFVGBoxes.pop()
                 box.delete(oldFVG)
@@ -1000,7 +1028,7 @@ f_mtf_processHTFStructure() =>
             htfFVGTops.unshift(htfLow_v)
             htfFVGBots.unshift(htfHigh3_v)
             htfFVGBiases.unshift(BULLISH)
-        if not na(htfHigh_v) and not na(htfLow3_v) and htfHigh_v < htfLow3_v and prevHTFClose != htfClose
+        if not na(htfHigh_v) and not na(htfLow3_v) and htfHigh_v < htfLow3_v and _prevHTFClose != htfClose
             if htfFVGBoxes.size() >= maxHTFZonesInput
                 box oldFVG = htfFVGBoxes.pop()
                 box.delete(oldFVG)
@@ -1012,8 +1040,9 @@ f_mtf_processHTFStructure() =>
             htfFVGTops.unshift(htfLow3_v)
             htfFVGBots.unshift(htfHigh_v)
             htfFVGBiases.unshift(BEARISH)
-    prevHTFClose := htfClose
-    htfTrendBias := htfTrendBiasVal
+    _prevHTFClose := htfClose
+    _htfTrendBias := _htfTrendBiasVal
+    [_htfLastPivotH, _htfPivotHigh, _htfHighCrossed, _htfPivotHighTime, _prevHTFSwH, _htfLastPivotL, _htfPivotLow, _htfLowCrossed, _htfPivotLowTime, _prevHTFSwL, _htfTrendBiasVal, _htfLastBOS, _htfLastCHoCH, _prevHTFClose, _htfTrendBias]
 
 //=============================================================================
 //--- MODULE: CONFLUENCE DETECTION ---//
@@ -1202,7 +1231,10 @@ if showHighLowSwingsInput or showPremiumDiscountZonesInput
     if showHighLowSwingsInput
         f_pd_drawHighLowSwings()
     if showPremiumDiscountZonesInput
-        f_pd_drawPremiumDiscountZones()
+        [_pdPct, _inPrem, _inDisc] = f_pd_drawPremiumDiscountZones()
+        pdPositionPct   := _pdPct
+        priceInPremium  := _inPrem
+        priceInDiscount := _inDisc
 
 // Extend unswept liquidity lines
 if showLiquiditySweepsInput and showEqualHighsLowsInput
@@ -1221,10 +1253,22 @@ if barstate.isconfirmed
         f_ms_getCurrentStructure(equalHighsLowsLengthInput, true, false)
 
     if showInternalsInput or showInternalOrderBlocksInput or showTrendInput
-        f_ms_displayStructure(true)
+        [_iBosP, _iBosBias, _iChochP, _iChochBias] = f_ms_displayStructure(true)
+        if not na(_iBosP)
+            lastBOSPrice := _iBosP
+            lastBOSBias  := _iBosBias
+        if not na(_iChochP)
+            lastCHoCHPrice := _iChochP
+            lastCHoCHBias  := _iChochBias
 
     if showStructureInput or showSwingOrderBlocksInput or showHighLowSwingsInput
-        f_ms_displayStructure(false)
+        [_sBosP, _sBosBias, _sChochP, _sChochBias] = f_ms_displayStructure(false)
+        if not na(_sBosP)
+            lastBOSPrice := _sBosP
+            lastBOSBias  := _sBosBias
+        if not na(_sChochP)
+            lastCHoCHPrice := _sChochP
+            lastCHoCHBias  := _sChochBias
 
     // Order Block mitigation
     if showInternalOrderBlocksInput
@@ -1238,11 +1282,28 @@ if barstate.isconfirmed
 
     // Liquidity sweep detection
     if showLiquiditySweepsInput and showEqualHighsLowsInput
-        f_liq_detectSweeps()
+        sweepResult = f_liq_detectSweeps()
+        if not na(sweepResult)
+            lastSweepLevel := sweepResult
 
     // MTF structure processing
     if showMTFAnalysisInput
-        f_mtf_processHTFStructure()
+        [_rLastPivotH, _rPivotHigh, _rHighCrossed, _rPivotHighTime, _rPrevSwH, _rLastPivotL, _rPivotLow, _rLowCrossed, _rPivotLowTime, _rPrevSwL, _rTrendBiasVal, _rLastBOS, _rLastCHoCH, _rPrevClose, _rTrendBias] = f_mtf_processHTFStructure()
+        htfLastPivotH    := _rLastPivotH
+        htfPivotHigh     := _rPivotHigh
+        htfHighCrossed   := _rHighCrossed
+        htfPivotHighTime := _rPivotHighTime
+        prevHTFSwH       := _rPrevSwH
+        htfLastPivotL    := _rLastPivotL
+        htfPivotLow      := _rPivotLow
+        htfLowCrossed    := _rLowCrossed
+        htfPivotLowTime  := _rPivotLowTime
+        prevHTFSwL       := _rPrevSwL
+        htfTrendBiasVal  := _rTrendBiasVal
+        htfLastBOS       := _rLastBOS
+        htfLastCHoCH     := _rLastCHoCH
+        prevHTFClose     := _rPrevClose
+        htfTrendBias     := _rTrendBias
 
     // Confluence detection
     [conf, confCount, confText] = f_confluence_detect()
