@@ -518,9 +518,12 @@ f_ob_checkMitigation(bool internal) =>
                 currentAlerts.swingBullishOrderBlock    := true
         if crossedOB
             if hideMitigatedOBsInput
-                _removed = orderBlocks.remove(index)
+                orderBlocks.remove(index)
+                na
             else
                 eachOB.state := 1
+                na
+    na
 
 f_ob_draw(bool internal) =>
     array<orderBlock> orderBlocks = internal ? internalOrderBlocks : swingOrderBlocks
@@ -709,6 +712,7 @@ f_fvg_checkFill() =>
                 eachFVG.topBox.delete()
                 eachFVG.bottomBox.delete()
                 fairValueGaps.remove(index)
+                na
             else if low < eachFVG.top
                 eachFVG.top := low
                 midPrice = math.avg(eachFVG.top, eachFVG.originalBottom)
@@ -719,11 +723,14 @@ f_fvg_checkFill() =>
                     eachFVG.topBox.delete()
                     eachFVG.bottomBox.delete()
                     fairValueGaps.remove(index)
+                    na
+                na
         else
             if high >= eachFVG.originalTop
                 eachFVG.topBox.delete()
                 eachFVG.bottomBox.delete()
                 fairValueGaps.remove(index)
+                na
             else if high > eachFVG.bottom
                 eachFVG.bottom := high
                 midPrice = math.avg(eachFVG.originalTop, eachFVG.bottom)
@@ -734,6 +741,9 @@ f_fvg_checkFill() =>
                     eachFVG.topBox.delete()
                     eachFVG.bottomBox.delete()
                     fairValueGaps.remove(index)
+                    na
+                na
+    na
 
 f_fvg_detect() =>
     // Use pre-fetched global request.security data (anti-repainting)
