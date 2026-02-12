@@ -519,11 +519,11 @@ f_ob_checkMitigation(bool internal) =>
         if crossedOB
             if hideMitigatedOBsInput
                 orderBlocks.remove(index)
-                na
+                int(na)
             else
                 eachOB.state := 1
-                na
-    na
+                int(na)
+    int(na)
 
 f_ob_draw(bool internal) =>
     array<orderBlock> orderBlocks = internal ? internalOrderBlocks : swingOrderBlocks
@@ -712,7 +712,7 @@ f_fvg_checkFill() =>
                 eachFVG.topBox.delete()
                 eachFVG.bottomBox.delete()
                 fairValueGaps.remove(index)
-                na
+                int(na)
             else if low < eachFVG.top
                 eachFVG.top := low
                 midPrice = math.avg(eachFVG.top, eachFVG.originalBottom)
@@ -723,14 +723,14 @@ f_fvg_checkFill() =>
                     eachFVG.topBox.delete()
                     eachFVG.bottomBox.delete()
                     fairValueGaps.remove(index)
-                    na
-                na
+                    int(na)
+                int(na)
         else
             if high >= eachFVG.originalTop
                 eachFVG.topBox.delete()
                 eachFVG.bottomBox.delete()
                 fairValueGaps.remove(index)
-                na
+                int(na)
             else if high > eachFVG.bottom
                 eachFVG.bottom := high
                 midPrice = math.avg(eachFVG.originalTop, eachFVG.bottom)
@@ -741,9 +741,9 @@ f_fvg_checkFill() =>
                     eachFVG.topBox.delete()
                     eachFVG.bottomBox.delete()
                     fairValueGaps.remove(index)
-                    na
-                na
-    na
+                    int(na)
+                int(na)
+    int(na)
 
 f_fvg_detect() =>
     // Use pre-fetched global request.security data (anti-repainting)
@@ -1250,78 +1250,79 @@ if showHighLowSwingsInput or showPremiumDiscountZonesInput
 if showLiquiditySweepsInput and showEqualHighsLowsInput
     f_liq_extendLines()
 
-//--- ALL SIGNAL DETECTION WRAPPED IN barstate.isconfirmed ---//
-if barstate.isconfirmed
-    // FVG partial fill check (must be inside isconfirmed to avoid repainting)
-    if showFairValueGapsInput
-        f_fvg_checkFill()
-    // Market Structure detection
-    f_ms_getCurrentStructure(swingsLengthInput, false, false)
-    f_ms_getCurrentStructure(5, false, true)
+//--- SIGNAL DETECTION (called unconditionally for ta.*/var state consistency) ---//
 
-    if showEqualHighsLowsInput
-        f_ms_getCurrentStructure(equalHighsLowsLengthInput, true, false)
+// FVG partial fill check
+if showFairValueGapsInput
+    f_fvg_checkFill()
 
-    if showInternalsInput or showInternalOrderBlocksInput or showTrendInput
-        [_iBosP, _iBosBias, _iChochP, _iChochBias] = f_ms_displayStructure(true)
-        if not na(_iBosP)
-            lastBOSPrice := _iBosP
-            lastBOSBias  := _iBosBias
-        if not na(_iChochP)
-            lastCHoCHPrice := _iChochP
-            lastCHoCHBias  := _iChochBias
+// Market Structure detection
+f_ms_getCurrentStructure(swingsLengthInput, false, false)
+f_ms_getCurrentStructure(5, false, true)
 
-    if showStructureInput or showSwingOrderBlocksInput or showHighLowSwingsInput
-        [_sBosP, _sBosBias, _sChochP, _sChochBias] = f_ms_displayStructure(false)
-        if not na(_sBosP)
-            lastBOSPrice := _sBosP
-            lastBOSBias  := _sBosBias
-        if not na(_sChochP)
-            lastCHoCHPrice := _sChochP
-            lastCHoCHBias  := _sChochBias
+if showEqualHighsLowsInput
+    f_ms_getCurrentStructure(equalHighsLowsLengthInput, true, false)
 
-    // Order Block mitigation
-    if showInternalOrderBlocksInput
-        f_ob_checkMitigation(true)
-    if showSwingOrderBlocksInput
-        f_ob_checkMitigation(false)
+if showInternalsInput or showInternalOrderBlocksInput or showTrendInput
+    [_iBosP, _iBosBias, _iChochP, _iChochBias] = f_ms_displayStructure(true)
+    if not na(_iBosP)
+        lastBOSPrice := _iBosP
+        lastBOSBias  := _iBosBias
+    if not na(_iChochP)
+        lastCHoCHPrice := _iChochP
+        lastCHoCHBias  := _iChochBias
 
-    // FVG detection
-    if showFairValueGapsInput
-        f_fvg_detect()
+if showStructureInput or showSwingOrderBlocksInput or showHighLowSwingsInput
+    [_sBosP, _sBosBias, _sChochP, _sChochBias] = f_ms_displayStructure(false)
+    if not na(_sBosP)
+        lastBOSPrice := _sBosP
+        lastBOSBias  := _sBosBias
+    if not na(_sChochP)
+        lastCHoCHPrice := _sChochP
+        lastCHoCHBias  := _sChochBias
 
-    // Liquidity sweep detection
-    if showLiquiditySweepsInput and showEqualHighsLowsInput
-        sweepResult = f_liq_detectSweeps()
-        if not na(sweepResult)
-            lastSweepLevel := sweepResult
+// Order Block mitigation
+if showInternalOrderBlocksInput
+    f_ob_checkMitigation(true)
+if showSwingOrderBlocksInput
+    f_ob_checkMitigation(false)
 
-    // MTF structure processing
-    if showMTFAnalysisInput
-        [_rLastPivotH, _rPivotHigh, _rHighCrossed, _rPivotHighTime, _rPrevSwH, _rLastPivotL, _rPivotLow, _rLowCrossed, _rPivotLowTime, _rPrevSwL, _rTrendBiasVal, _rLastBOS, _rLastCHoCH, _rPrevClose, _rTrendBias] = f_mtf_processHTFStructure()
-        htfLastPivotH    := _rLastPivotH
-        htfPivotHigh     := _rPivotHigh
-        htfHighCrossed   := _rHighCrossed
-        htfPivotHighTime := _rPivotHighTime
-        prevHTFSwH       := _rPrevSwH
-        htfLastPivotL    := _rLastPivotL
-        htfPivotLow      := _rPivotLow
-        htfLowCrossed    := _rLowCrossed
-        htfPivotLowTime  := _rPivotLowTime
-        prevHTFSwL       := _rPrevSwL
-        htfTrendBiasVal  := _rTrendBiasVal
-        htfLastBOS       := _rLastBOS
-        htfLastCHoCH     := _rLastCHoCH
-        prevHTFClose     := _rPrevClose
-        htfTrendBias     := _rTrendBias
+// FVG detection
+if showFairValueGapsInput
+    f_fvg_detect()
 
-    // Confluence detection
-    [conf, confCount, confText] = f_confluence_detect()
-    isConfluence    := conf
-    confluenceCount := confCount
-    confluenceText  := confText
-    if conf
-        currentAlerts.htfConfluence := true
+// Liquidity sweep detection
+if showLiquiditySweepsInput and showEqualHighsLowsInput
+    sweepResult = f_liq_detectSweeps()
+    if not na(sweepResult)
+        lastSweepLevel := sweepResult
+
+// MTF structure processing
+if showMTFAnalysisInput
+    [_rLastPivotH, _rPivotHigh, _rHighCrossed, _rPivotHighTime, _rPrevSwH, _rLastPivotL, _rPivotLow, _rLowCrossed, _rPivotLowTime, _rPrevSwL, _rTrendBiasVal, _rLastBOS, _rLastCHoCH, _rPrevClose, _rTrendBias] = f_mtf_processHTFStructure()
+    htfLastPivotH    := _rLastPivotH
+    htfPivotHigh     := _rPivotHigh
+    htfHighCrossed   := _rHighCrossed
+    htfPivotHighTime := _rPivotHighTime
+    prevHTFSwH       := _rPrevSwH
+    htfLastPivotL    := _rLastPivotL
+    htfPivotLow      := _rPivotLow
+    htfLowCrossed    := _rLowCrossed
+    htfPivotLowTime  := _rPivotLowTime
+    prevHTFSwL       := _rPrevSwL
+    htfTrendBiasVal  := _rTrendBiasVal
+    htfLastBOS       := _rLastBOS
+    htfLastCHoCH     := _rLastCHoCH
+    prevHTFClose     := _rPrevClose
+    htfTrendBias     := _rTrendBias
+
+// Confluence detection
+[conf, confCount, confText] = f_confluence_detect()
+isConfluence    := conf
+confluenceCount := confCount
+confluenceText  := confText
+if conf
+    currentAlerts.htfConfluence := true
 
 //--- OB Drawing (performance: only on last bars) ---//
 if barstate.islastconfirmedhistory or barstate.islast
