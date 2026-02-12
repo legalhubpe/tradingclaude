@@ -497,32 +497,33 @@ f_ob_store(pivot p_ivot, bool internal, int bias) =>
 
 f_ob_checkMitigation(bool internal) =>
     array<orderBlock> orderBlocks = internal ? internalOrderBlocks : swingOrderBlocks
-    for index = orderBlocks.size() - 1 to 0
-        if index >= orderBlocks.size()
-            continue
-        orderBlock eachOB = orderBlocks.get(index)
-        if eachOB.state == 1
-            continue
-        bool crossedOB = false
-        if bearishOrderBlockMitigationSource > eachOB.barHigh and eachOB.bias == BEARISH
-            crossedOB := true
-            if internal
-                currentAlerts.internalBearishOrderBlock := true
-            else
-                currentAlerts.swingBearishOrderBlock    := true
-        else if bullishOrderBlockMitigationSource < eachOB.barLow and eachOB.bias == BULLISH
-            crossedOB := true
-            if internal
-                currentAlerts.internalBullishOrderBlock := true
-            else
-                currentAlerts.swingBullishOrderBlock    := true
-        if crossedOB
-            if hideMitigatedOBsInput
-                orderBlocks.remove(index)
-                int(na)
-            else
-                eachOB.state := 1
-                int(na)
+    if orderBlocks.size() > 0
+        for index = orderBlocks.size() - 1 to 0
+            if index >= orderBlocks.size()
+                continue
+            orderBlock eachOB = orderBlocks.get(index)
+            if eachOB.state == 1
+                continue
+            bool crossedOB = false
+            if bearishOrderBlockMitigationSource > eachOB.barHigh and eachOB.bias == BEARISH
+                crossedOB := true
+                if internal
+                    currentAlerts.internalBearishOrderBlock := true
+                else
+                    currentAlerts.swingBearishOrderBlock    := true
+            else if bullishOrderBlockMitigationSource < eachOB.barLow and eachOB.bias == BULLISH
+                crossedOB := true
+                if internal
+                    currentAlerts.internalBullishOrderBlock := true
+                else
+                    currentAlerts.swingBullishOrderBlock    := true
+            if crossedOB
+                if hideMitigatedOBsInput
+                    orderBlocks.remove(index)
+                    int(na)
+                else
+                    eachOB.state := 1
+                    int(na)
     int(na)
 
 f_ob_draw(bool internal) =>
@@ -703,46 +704,47 @@ f_fvg_box(int leftTime, int rightTime, float topPrice, float bottomPrice, color 
     box.new(chart.point.new(leftTime, na, topPrice), chart.point.new(rightTime + fairValueGapsExtendInput * (time - time[1]), na, bottomPrice), xloc = xloc.bar_time, border_color = boxColor, bgcolor = boxColor)
 
 f_fvg_checkFill() =>
-    for index = fairValueGaps.size() - 1 to 0
-        if index >= fairValueGaps.size()
-            continue
-        fairValueGap eachFVG = fairValueGaps.get(index)
-        if eachFVG.bias == BULLISH
-            if low <= eachFVG.originalBottom
-                eachFVG.topBox.delete()
-                eachFVG.bottomBox.delete()
-                fairValueGaps.remove(index)
-                int(na)
-            else if low < eachFVG.top
-                eachFVG.top := low
-                midPrice = math.avg(eachFVG.top, eachFVG.originalBottom)
-                eachFVG.topBox.set_top_left_point(chart.point.new(eachFVG.topBox.get_left(), na, eachFVG.top))
-                eachFVG.topBox.set_bottom_right_point(chart.point.new(eachFVG.topBox.get_right(), na, midPrice))
-                eachFVG.bottomBox.set_top_left_point(chart.point.new(eachFVG.bottomBox.get_left(), na, midPrice))
-                if eachFVG.top <= eachFVG.originalBottom
+    if fairValueGaps.size() > 0
+        for index = fairValueGaps.size() - 1 to 0
+            if index >= fairValueGaps.size()
+                continue
+            fairValueGap eachFVG = fairValueGaps.get(index)
+            if eachFVG.bias == BULLISH
+                if low <= eachFVG.originalBottom
                     eachFVG.topBox.delete()
                     eachFVG.bottomBox.delete()
                     fairValueGaps.remove(index)
                     int(na)
-                int(na)
-        else
-            if high >= eachFVG.originalTop
-                eachFVG.topBox.delete()
-                eachFVG.bottomBox.delete()
-                fairValueGaps.remove(index)
-                int(na)
-            else if high > eachFVG.bottom
-                eachFVG.bottom := high
-                midPrice = math.avg(eachFVG.originalTop, eachFVG.bottom)
-                eachFVG.bottomBox.set_bottom_right_point(chart.point.new(eachFVG.bottomBox.get_right(), na, eachFVG.bottom))
-                eachFVG.bottomBox.set_top_left_point(chart.point.new(eachFVG.bottomBox.get_left(), na, midPrice))
-                eachFVG.topBox.set_bottom_right_point(chart.point.new(eachFVG.topBox.get_right(), na, midPrice))
-                if eachFVG.bottom >= eachFVG.originalTop
+                else if low < eachFVG.top
+                    eachFVG.top := low
+                    midPrice = math.avg(eachFVG.top, eachFVG.originalBottom)
+                    eachFVG.topBox.set_top_left_point(chart.point.new(eachFVG.topBox.get_left(), na, eachFVG.top))
+                    eachFVG.topBox.set_bottom_right_point(chart.point.new(eachFVG.topBox.get_right(), na, midPrice))
+                    eachFVG.bottomBox.set_top_left_point(chart.point.new(eachFVG.bottomBox.get_left(), na, midPrice))
+                    if eachFVG.top <= eachFVG.originalBottom
+                        eachFVG.topBox.delete()
+                        eachFVG.bottomBox.delete()
+                        fairValueGaps.remove(index)
+                        int(na)
+                    int(na)
+            else
+                if high >= eachFVG.originalTop
                     eachFVG.topBox.delete()
                     eachFVG.bottomBox.delete()
                     fairValueGaps.remove(index)
                     int(na)
-                int(na)
+                else if high > eachFVG.bottom
+                    eachFVG.bottom := high
+                    midPrice = math.avg(eachFVG.originalTop, eachFVG.bottom)
+                    eachFVG.bottomBox.set_bottom_right_point(chart.point.new(eachFVG.bottomBox.get_right(), na, eachFVG.bottom))
+                    eachFVG.bottomBox.set_top_left_point(chart.point.new(eachFVG.bottomBox.get_left(), na, midPrice))
+                    eachFVG.topBox.set_bottom_right_point(chart.point.new(eachFVG.topBox.get_right(), na, midPrice))
+                    if eachFVG.bottom >= eachFVG.originalTop
+                        eachFVG.topBox.delete()
+                        eachFVG.bottomBox.delete()
+                        fairValueGaps.remove(index)
+                        int(na)
+                    int(na)
     int(na)
 
 f_fvg_detect() =>
